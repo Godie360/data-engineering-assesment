@@ -12,6 +12,8 @@ When everything is running, open **http://localhost:3000** in your browser:
 
 ![Sele the Analyst — chat interface](docs/screenshot.png)
 
+![Sele the Analyst — SQL expander with hallucination check](docs/screenshot2.png)
+
 Every answer shows:
 - A **confidence badge** (HIGH / MEDIUM / LOW) based on hallucination detection
 - The **SQL query** that was generated and executed
