@@ -10,12 +10,13 @@ const SELCOM_RED = "#E2001A";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface BotPayload {
   answer: string;
-  sql: string;
-  explanation: string;
+  question_type: "data_query" | "clarification" | "not_answerable";
+  sql?: string;
+  explanation?: string;
   rows_returned: number;
   confidence_label: "HIGH" | "MEDIUM" | "LOW";
   final_confidence: number;
-  back_question: string;
+  back_question?: string;
   warnings: string[];
   results_preview: Record<string, unknown>[];
 }
@@ -92,7 +93,7 @@ function SqlExpander({ payload }: { payload: BotPayload }) {
           {/* Back-translation */}
           {payload.back_question && (
             <div className="px-4 py-3 border-t border-zinc-800 text-zinc-500 text-[11px]">
-              <span className="text-zinc-400 font-semibold">Verification: </span>
+              <span className="text-zinc-400 font-semibold">Hallucination check: </span>
               {payload.back_question}
             </div>
           )}
@@ -178,12 +179,14 @@ function MessageBubble({ msg }: { msg: Message }) {
     );
   }
 
+  const isDataQuery = msg.payload?.question_type === "data_query";
+
   return (
     <div className="flex justify-start gap-3">
       <Avatar />
       <div className="max-w-[85%] space-y-2">
-        {/* Confidence + warnings */}
-        {msg.payload && (
+        {/* Confidence badge + warnings — only for data queries */}
+        {msg.payload && isDataQuery && (
           <div className="flex flex-wrap items-center gap-2">
             <ConfidenceBadge label={msg.payload.confidence_label} score={msg.payload.final_confidence} />
             {msg.payload.warnings.map((w, i) => (
@@ -202,8 +205,10 @@ function MessageBubble({ msg }: { msg: Message }) {
           </div>
         </div>
 
-        {/* SQL expander */}
-        {msg.payload && <SqlExpander payload={msg.payload} />}
+        {/* SQL expander — only for data queries with SQL */}
+        {msg.payload && isDataQuery && msg.payload.sql && (
+          <SqlExpander payload={msg.payload} />
+        )}
       </div>
     </div>
   );
@@ -233,6 +238,8 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Stable thread ID for the lifetime of this browser session
+  const threadId = useRef(crypto.randomUUID());
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -249,7 +256,7 @@ export default function ChatPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim() }),
+        body: JSON.stringify({ message: text.trim(), thread_id: threadId.current }),
       });
       const data = await res.json();
 
