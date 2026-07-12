@@ -114,7 +114,7 @@ def build_graph(client: OpenAI, pool):
         return {
             "back_question": v.back_question,
             "final_confidence": v.final_confidence,
-            "confidence_label": v.confidence_label,
+            "confidence_label": v.label,
             "warnings": v.warnings,
         }
 
