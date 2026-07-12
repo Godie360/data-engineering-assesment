@@ -1,12 +1,12 @@
 services:
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # ── 1. Database ───────────────────────────────────────────────────────────────
   postgres:
     image: postgres:15
     container_name: selcom_postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-selcom_assessment}
-      POSTGRES_USER: ${POSTGRES_USER:-selcom}
+      POSTGRES_DB:       ${POSTGRES_DB:-selcom_assessment}
+      POSTGRES_USER:     ${POSTGRES_USER:-selcom}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-selcom_pass}
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
@@ -16,13 +16,30 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-selcom} -d ${POSTGRES_DB:-selcom_assessment}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
-  # ── Data pipeline (run once, then exits) ───────────────────────────────────
+  # ── 2. Data pipeline (runs once, then exits) ──────────────────────────────────
+  #
+  #   Phases:
+  #     [1/3] Apply schema   — CREATE TABLE IF NOT EXISTS + indexes
+  #     [2/3] Load CSV data  — chunked COPY (100k rows/chunk) → PostgreSQL
+  #     [3/3] Build summary  — INSERT … SELECT → transaction_summary (45 rows)
+  #
+  #   Watch progress:
+  #     docker compose logs pipeline -f
+  #
   pipeline:
     build: .
     container_name: selcom_pipeline
-    command: sh -c "python sql/apply_schema.py && python run_pipeline.py"
+    command: >
+      sh -c "
+        echo '──────────────────────────────────────────' &&
+        echo '  Waiting for PostgreSQL to be ready...'   &&
+        echo '──────────────────────────────────────────' &&
+        python sql/apply_schema.py &&
+        python run_pipeline.py
+      "
     env_file: .env
     environment:
       POSTGRES_HOST: postgres
@@ -32,12 +49,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: "no"
 
-  # ── FastAPI RAG backend ────────────────────────────────────────────────────
+  # ── 3. FastAPI RAG backend ────────────────────────────────────────────────────
+  #
+  #   Starts only after pipeline exits successfully.
+  #   POST /api/chat  — NL question → SQL → results → hallucination check → answer
+  #   GET  /health    — liveness probe
+  #
   api:
     build: .
     container_name: selcom_api
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level info
     env_file: .env
     environment:
       POSTGRES_HOST: postgres
@@ -52,9 +75,14 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 6
+    restart: unless-stopped
 
-  # ── Next.js chat UI ────────────────────────────────────────────────────────
+  # ── 4. Next.js chat UI ────────────────────────────────────────────────────────
+  #
+  #   Starts only after API passes its health check.
+  #   Open: http://localhost:3000
+  #
   frontend:
     build:
       context: ./frontend
@@ -67,6 +95,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

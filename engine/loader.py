@@ -52,5 +52,4 @@ def iter_chunks(csv_path: str | Path) -> Iterator[tuple[int, pd.DataFrame]]:
         chunksize=CHUNK_SIZE,
     )
     for idx, chunk in enumerate(reader):
-        logger.info("Loaded chunk %d (%d rows)", idx, len(chunk))
         yield idx, chunk
