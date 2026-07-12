@@ -123,30 +123,6 @@ Start asking questions about the data.
 
 ---
 
-## What to Ask Sele
-
-Copy and paste any of these to get started:
-
-```
-Give me an overview of this data
-What is the total value of fraudulent transfers?
-What percentage of TRANSFER transactions are fraudulent?
-Which transaction type has the highest average amount?
-What is the busiest hour for transaction volume?
-Show fraud rate by transaction type
-Compare total deposits vs total withdrawals
-Which day had the highest number of fraudulent transactions?
-What is the largest single fraudulent transaction?
-Show balance errors by transaction type
-How many unique merchant accounts received payments?
-What is the net money flow per simulation day?
-```
-
-You can also ask follow-up questions after any answer:
-- "What do you mean by hour 0?"
-- "Is that fraud rate normal?"
-- "Explain that result"
-
 ---
 
 ## Watching the Pipeline Load (Optional)
