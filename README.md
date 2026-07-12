@@ -10,20 +10,7 @@ Ask plain-English questions. Get real answers — backed by actual database resu
 
 When everything is running, open **http://localhost:3000** in your browser:
 
-```
-┌─────────────────────────────────────────────────────┐
-│  selcom  │  Sele the Analyst  ·  4.2M transactions  │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│   Hi, I'm Sele the Analyst                         │
-│   Ask me anything about the transaction data.       │
-│                                                     │
-│  [ What is the total fraud value?         ]         │
-│  [ Which hour is busiest for payments?    ]         │
-│  [ Show fraud rate by transaction type   ]         │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
+![Sele the Analyst — chat interface](docs/screenshot.png)
 
 Every answer shows:
 - A **confidence badge** (HIGH / MEDIUM / LOW) based on hallucination detection
