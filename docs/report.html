@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Technical Report — Selcom Data Engineer Assessment</title>
+<style>
+  :root {
+    --red: #C8001A;
+    --dark: #1a1a1a;
+    --mid: #444;
+    --light: #666;
+    --border: #e0e0e0;
+    --bg: #fafafa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 10.5pt;
+    color: var(--dark);
+    background: #fff;
+    line-height: 1.65;
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 56px;
+  }
+
+  /* ── Header ── */
+  .header {
+    border-bottom: 3px solid var(--red);
+    padding-bottom: 18px;
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .header-left h1 {
+    font-size: 20pt;
+    font-weight: bold;
+    color: var(--dark);
+    letter-spacing: -0.3px;
+  }
+
+  .header-left .subtitle {
+    font-size: 10pt;
+    color: var(--light);
+    margin-top: 3px;
+    font-style: italic;
+  }
+
+  .header-right {
+    text-align: right;
+    font-size: 9pt;
+    color: var(--light);
+    line-height: 1.8;
+  }
+
+  .header-right .candidate {
+    font-size: 10.5pt;
+    font-weight: bold;
+    color: var(--dark);
+  }
+
+  /* ── Section titles ── */
+  h2 {
+    font-size: 11.5pt;
+    font-weight: bold;
+    color: var(--red);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-top: 26px;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 10.5pt;
+    font-weight: bold;
+    color: var(--dark);
+    margin-top: 14px;
+    margin-bottom: 5px;
+  }
+
+  p {
+    margin-bottom: 8px;
+    color: var(--dark);
+  }
+
+  /* ── Executive summary box ── */
+  .summary-box {
+    background: var(--bg);
+    border-left: 4px solid var(--red);
+    padding: 14px 18px;
+    margin: 18px 0 24px;
+    font-size: 10.5pt;
+    color: var(--mid);
+    line-height: 1.7;
+  }
+
+  /* ── Decision table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 12px 0 16px;
+  }
+
+  thead tr {
+    background: var(--red);
+    color: #fff;
+  }
+
+  thead th {
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: bold;
+    letter-spacing: 0.3px;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #fef5f5;
+  }
+
+  tbody td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tbody td:first-child {
+    font-weight: bold;
+    color: var(--mid);
+    white-space: nowrap;
+    width: 28%;
+  }
+
+  /* ── Inline code ── */
+  code {
+    font-family: 'Courier New', monospace;
+    font-size: 9pt;
+    background: #f4f4f4;
+    border: 1px solid #ddd;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #c7001a;
+  }
+
+  /* ── Assumptions list ── */
+  ul {
+    margin: 8px 0 12px 18px;
+    color: var(--dark);
+  }
+
+  ul li {
+    margin-bottom: 5px;
+  }
+
+  ul li strong {
+    color: var(--dark);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 8.5pt;
+    color: var(--light);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── Architecture diagram ── */
+  .diagram {
+    background: #1a1a1a;
+    color: #ccc;
+    font-family: 'Courier New', monospace;
+    font-size: 8.5pt;
+    padding: 14px 18px;
+    border-radius: 4px;
+    margin: 10px 0 14px;
+    line-height: 1.7;
+  }
+
+  .diagram .red { color: #ff6b6b; }
+  .diagram .green { color: #69db7c; }
+
+  /* ── Print ── */
+  @media print {
+    body { font-size: 10pt; }
+    .page { padding: 32px 44px; max-width: 100%; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+    .summary-box { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Technical Assessment Report</h1>
+      <div class="subtitle">Data Engineer Pre-Interview Task — Selcom Paytech Ltd</div>
+    </div>
+    <div class="header-right">
+      <div class="candidate">Godfrey Enosh</div>
+      <div>judymartbagenda@gmail.com</div>
+      <div>July 2026</div>
+    </div>
+  </div>
+
+  <!-- Executive Summary -->
+  <div class="summary-box">
+    I built an end-to-end data engineering system on 4,225,958 synthetic East African mobile money
+    transactions: a chunked Python pipeline loading data into PostgreSQL, and a Text-to-SQL RAG
+    chatbot — <strong>Sele the Analyst</strong> — that answers plain-English questions about the data
+    with grounded, hallucination-checked responses and a confidence score.
+    The full stack runs with a single <code>docker compose up</code> command.
+  </div>
+
+  <!-- 1. Approach -->
+  <h2>1. Approach</h2>
+
+  <h3>Dataset</h3>
+  <p>
+    I selected the <strong>MoMTSim Synthetic Mobile Money Transaction Dataset</strong> (Kaggle, CC0) —
+    4,225,958 rows covering five M-Pesa-style transaction types across nine simulation days.
+    This exceeds the 50,000-row minimum by 84× and closely mirrors real East African mobile money patterns.
+  </p>
+
+  <h3>Data Pipeline — Load · Clean · Transform · Store</h3>
+  <p>
+    The pipeline processes the CSV in <strong>100,000-row chunks</strong> using
+    <code>pandas.read_csv(chunksize=100_000)</code>, keeping memory flat at ~150 MB regardless of
+    file size. Each chunk is cleaned (null drops, type normalisation, deduplication) and enriched
+    with seven derived columns before being written to PostgreSQL.
+  </p>
+  <p>
+    Bulk insert uses <code>COPY FROM STDIN</code> via <code>psycopg2.copy_expert</code> — achieving
+    ~80,000 rows/second vs ~1,000 rows/second for row-by-row <code>INSERT</code>. Full load completes
+    in approximately 2 minutes. A <code>transaction_summary</code> pre-aggregation table (45 rows:
+    9 days × 5 types) is computed once after load, reducing analytical query cost from 4.2M row scans
+    to 45-row lookups.
+  </p>
+
+  <h3>RAG Application — Sele the Analyst</h3>
+  <p>
+    I chose <strong>Text-to-SQL RAG</strong> over vector similarity retrieval — the correct pattern for
+    structured relational data. Vector search is designed for unstructured text documents; for financial
+    records in a relational database, the correct flow is: question → SQL → execute → ground the answer
+    in real results. The LLM cannot hallucinate a number because it reads from actual rows.
+  </p>
+
+  <div class="diagram">
+<span class="green">Question</span> → [LangGraph: classify]
+  ├─ <span class="red">data query</span>  → [GPT-4o-mini: generate SQL] → [PostgreSQL: execute]
+  │                → [back-translation: hallucination check] → [GPT-4o-mini: answer]
+  ├─ <span class="red">follow-up</span>   → [GPT-4o-mini: conversational reply using history]
+  └─ <span class="red">out-of-scope</span>→ [block with explanation]
+  </div>
+
+  <p>
+    <strong>LangGraph</strong> orchestrates the pipeline with a <code>MemorySaver</code> checkpointer,
+    maintaining per-session conversation history via a <code>thread_id</code>. This enables natural
+    follow-up questions ("what do you mean by hour 0?") to receive contextual clarifications rather
+    than SQL queries. The backend is FastAPI; the UI is Next.js branded as Sele the Analyst.
+  </p>
+
+  <!-- 2. Engineering Decisions -->
+  <h2>2. Key Engineering Decisions</h2>
+
+  <table>
+    <thead>
+      <tr><th>Decision</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Chunked CSV loading</td>
+        <td>Prevents OOM on large files. Same code handles 4M or 400M rows without modification.</td>
+      </tr>
+      <tr>
+        <td>PostgreSQL COPY over INSERT</td>
+        <td>80× faster bulk insert — 2 minutes vs ~70 minutes for 4.2M rows.</td>
+      </tr>
+      <tr>
+        <td>Pre-aggregation table</td>
+        <td>Daily/type analytics scan 45 rows instead of 4.2M — zero query-time aggregation cost.</td>
+      </tr>
+      <tr>
+        <td>Text-to-SQL vs vector RAG</td>
+        <td>Structured data lives in a relational database. SQL gives exact answers; vector similarity gives approximate document matches.</td>
+      </tr>
+      <tr>
+        <td>Hallucination detection</td>
+        <td>Back-translation re-reads the generated SQL and scores alignment with the original question 0–1. Final confidence = (LLM self-confidence + alignment) / 2.</td>
+      </tr>
+      <tr>
+        <td>Read-only DB transaction</td>
+        <td><code>BEGIN READ ONLY … ROLLBACK</code> ensures no SQL generated by the LLM can ever modify data, even if guardrails fail.</td>
+      </tr>
+      <tr>
+        <td>LangGraph orchestration</td>
+        <td>Separates routing, SQL generation, execution, validation, and response into discrete, testable nodes. MemorySaver provides per-session conversation memory.</td>
+      </tr>
+      <tr>
+        <td>Docker multi-service stack</td>
+        <td>Reproducible, dependency-free setup. Four services start in correct order via health checks. Evaluators run one command.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 3. Challenges -->
+  <h2>3. Challenges &amp; How I Solved Them</h2>
+
+  <table>
+    <thead>
+      <tr><th>Challenge</th><th>Solution</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Out-of-memory on 4.2M rows</td>
+        <td>Chunked reading with <code>chunksize=100_000</code> — memory stays flat throughout.</td>
+      </tr>
+      <tr>
+        <td>Fraud SUM returning NULL</td>
+        <td>Transaction types with zero fraud rows return NULL from <code>SUM(amount) FILTER (WHERE is_fraud)</code>. Fixed with <code>COALESCE(…, 0)</code>.</td>
+      </tr>
+      <tr>
+        <td>LLM querying wrong table</td>
+        <td>The model used <code>transaction_summary.transaction_hour</code> (column does not exist). Fixed by adding explicit TABLE SELECTION RULES and a targeted few-shot example to the schema context.</td>
+      </tr>
+      <tr>
+        <td>Gibberish returning results</td>
+        <td>Three-layer guard: UI pre-validation, LLM <code>NOT_ANSWERABLE</code> signal, Python regex blocking unsafe SQL keywords.</td>
+      </tr>
+      <tr>
+        <td>Follow-up questions blocked</td>
+        <td>Added LangGraph <code>classify</code> node: detects follow-up vs data query and routes to a <code>clarify</code> node that responds using conversation history.</td>
+      </tr>
+      <tr>
+        <td>Docker healthcheck failure</td>
+        <td><code>python:3.11-slim</code> has no <code>curl</code>. Replaced with <code>python -c "urllib.request.urlopen(...)"</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 4. Assumptions -->
+  <h2>4. Assumptions</h2>
+
+  <ul>
+    <li><strong>Step = simulation hour:</strong> The dataset <code>step</code> column represents elapsed hours. <code>step % 24</code> gives hour of day; <code>(step // 24) + 1</code> gives simulation day (1–9).</li>
+    <li><strong>Single currency:</strong> No currency conversion applied — all amounts are treated as one local unit, consistent with M-Pesa simulation data.</li>
+    <li><strong>Fraud label is ground truth:</strong> The <code>isFraud</code> column is taken as authoritative. No additional fraud detection model was built.</li>
+    <li><strong>Static dataset:</strong> The pipeline is idempotent (<code>TRUNCATE … RESTART IDENTITY</code>) but does not handle real-time ingestion — outside the scope of this assessment.</li>
+    <li><strong>OpenAI API available:</strong> The RAG application requires an OpenAI API key and internet access. The assessment environment was assumed to have both.</li>
+    <li><strong>Demo-scale memory:</strong> <code>MemorySaver</code> stores conversation state in-memory per server process. Production would use a Redis or PostgreSQL-backed checkpointer for multi-user, persistent history.</li>
+  </ul>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>Godfrey Enosh — Selcom Paytech Data Engineer Assessment — July 2026</span>
+    <span>github.com/Godie360/data-engineering-assesment</span>
+  </div>
+
+</div>
+</body>
+</html>
