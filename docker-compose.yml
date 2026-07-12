@@ -1,9 +1,11 @@
+name: selcom-assessment
+
 services:
 
   # ── 1. Database ───────────────────────────────────────────────────────────────
   postgres:
     image: postgres:15
-    container_name: selcom_postgres
+    container_name: selcom-postgres
     environment:
       POSTGRES_DB:       ${POSTGRES_DB:-selcom_assessment}
       POSTGRES_USER:     ${POSTGRES_USER:-selcom}
@@ -26,17 +28,16 @@ services:
   #     [2/3] Load CSV data  — chunked COPY (100k rows/chunk) → PostgreSQL
   #     [3/3] Build summary  — INSERT … SELECT → transaction_summary (45 rows)
   #
-  #   Watch progress:
-  #     docker compose logs pipeline -f
+  #   Watch live:  docker compose logs pipeline -f
   #
   pipeline:
     build: .
-    container_name: selcom_pipeline
+    container_name: selcom-pipeline
     command: >
       sh -c "
-        echo '──────────────────────────────────────────' &&
-        echo '  Waiting for PostgreSQL to be ready...'   &&
-        echo '──────────────────────────────────────────' &&
+        echo '════════════════════════════════════════════' &&
+        echo '  Starting Selcom Data Pipeline...'          &&
+        echo '════════════════════════════════════════════' &&
         python sql/apply_schema.py &&
         python run_pipeline.py
       "
@@ -59,13 +60,13 @@ services:
   #
   api:
     build: .
-    container_name: selcom_api
+    container_name: selcom-api
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level info
     env_file: .env
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
-      CORS_ORIGINS: "http://localhost:3000,http://frontend:3000"
+      CORS_ORIGINS: "http://localhost:3000,http://chatbot-ui:3000"
     ports:
       - "8000:8000"
     depends_on:
@@ -78,16 +79,16 @@ services:
       retries: 6
     restart: unless-stopped
 
-  # ── 4. Next.js chat UI ────────────────────────────────────────────────────────
+  # ── 4. Sele the Analyst — Next.js chat UI ────────────────────────────────────
   #
   #   Starts only after API passes its health check.
-  #   Open: http://localhost:3000
+  #   Open:  http://localhost:3000
   #
-  frontend:
+  chatbot-ui:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: selcom_frontend
+    container_name: chatbot-ui
     ports:
       - "3000:3000"
     environment:
