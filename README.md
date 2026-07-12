@@ -1,237 +1,142 @@
-# Selcom Paytech — Data Engineer Assessment
+# Sele the Analyst — Selcom Data Intelligence
 
-**Sele the Analyst** — an end-to-end data pipeline and RAG chatbot built on 4.2 million synthetic East African mobile money transactions.
+A complete data engineering system built on **4.2 million** synthetic East African mobile money transactions.
 
----
-
-## What This Does
-
-1. **Data pipeline** — loads, cleans, transforms, and bulk-inserts 4.2M rows into PostgreSQL with chunked processing and a pre-aggregated summary table.
-2. **RAG application** — a Next.js chatbot (Sele the Analyst) that translates plain English questions into SQL, executes them against PostgreSQL, validates the answer with hallucination detection, and returns a grounded response with a confidence score.
+Ask plain-English questions. Get real answers — backed by actual database results, with a confidence score and hallucination detection.
 
 ---
 
-## Architecture
+## What You Will See
+
+When everything is running, open **http://localhost:3000** in your browser:
 
 ```
-docker compose up
-       │
-       ├── postgres        PostgreSQL 15 (port 5433)
-       │
-       ├── pipeline        Python: apply schema → load 4.2M rows → build summary table
-       │                   (exits on completion)
-       │
-       ├── api             FastAPI (port 8000) — RAG pipeline over HTTP
-       │                   POST /api/chat  →  SQL generation + execution + hallucination check
-       │
-       └── frontend        Next.js (port 3000) — Sele the Analyst chat UI
+┌─────────────────────────────────────────────────────┐
+│  selcom  │  Sele the Analyst  ·  4.2M transactions  │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│   Hi, I'm Sele the Analyst                         │
+│   Ask me anything about the transaction data.       │
+│                                                     │
+│  [ What is the total fraud value?         ]         │
+│  [ Which hour is busiest for payments?    ]         │
+│  [ Show fraud rate by transaction type   ]         │
+│                                                     │
+└─────────────────────────────────────────────────────┘
 ```
 
-**Data flow:**
-
-```
-CSV (4.2M rows)
-  └─► loader.py      chunk reader (100k rows / chunk)
-  └─► cleaner.py     null fills, type casts, drop invalid rows
-  └─► transformer.py 7 derived columns
-  └─► loader_db.py   PostgreSQL COPY (bulk insert)
-  └─► aggregator.py  INSERT…SELECT → transaction_summary
-
-PostgreSQL
-  ├── mobile_money_transactions  (4.2M cleaned + enriched rows)
-  └── transaction_summary        (9 days × 5 types = 45 summary rows)
-
-RAG pipeline (per question)
-  └─► query_gen.py    NL → SQL via GPT-4o-mini (JSON mode, temp=0)
-  └─► executor.py     SQL syntax check → read-only transaction → results
-  └─► hallucination.py back-translation alignment check + confidence score
-  └─► response_gen.py results → grounded answer (temp=0.3)
-```
+Every answer shows:
+- A **confidence badge** (HIGH / MEDIUM / LOW) based on hallucination detection
+- The **SQL query** that was generated and executed
+- A **data preview table** with the actual database results
+- A **back-translation check** — the system re-reads its own SQL to verify it answered correctly
 
 ---
 
-## Stack
+## Before You Start — What You Need
 
-| Layer | Technology | Why |
+Install these four things if you do not have them:
+
+| Tool | What it does | Download |
 |---|---|---|
-| Dataset | Synthetic Mobile Money (denishazamuke, Kaggle) | 4.2M rows, M-Pesa-style, CC0 |
-| Processing | Python 3.11 + pandas | Chunked reads — handles 4.2M rows without OOM |
-| Database | PostgreSQL 15 via Docker | Portable, production-grade RDBMS |
-| LLM | OpenAI `gpt-4o-mini` | Text-to-SQL + hallucination detection |
-| Backend | FastAPI + uvicorn | Clean REST API between pipeline and UI |
-| Frontend | Next.js 15 (App Router) | Streaming-ready chat UI with Tailwind CSS |
-| Containers | Docker + docker-compose | One-command full-stack startup |
+| **Docker Desktop** | Runs all 4 services with one command | https://www.docker.com/products/docker-desktop |
+| **Git** | Downloads the project code | https://git-scm.com/downloads |
+| **OpenAI API key** | Powers the AI question-answering | https://platform.openai.com/api-keys |
+| **The dataset CSV** | 4.2M transaction rows (too large for GitHub) | https://www.kaggle.com/datasets/denishazamuke/synthetic-mobile-money-transaction-dataset |
+
+> **No Python or Node.js needed** — Docker handles everything.
 
 ---
 
-## Prerequisites
+## Quick Start — 5 Steps
 
-- Docker Desktop (or OrbStack)
-- Python 3.11
-- Node.js 20+
-- OpenAI API key
+### Step 1 — Download the project
 
----
+```bash
+git clone https://github.com/Godie360/data-engineering-assesment.git
+cd data-engineering-assesment
+```
 
-## Setup
+### Step 2 — Add your OpenAI API key
 
-### Option A — Full Docker (recommended for demo)
+Copy the example environment file:
 
 ```bash
 cp .env.example .env
-# Edit .env and set OPENAI_API_KEY=sk-...
-
-# Place the source CSV at:
-#   data/MoMTSim_20240722202413_1000_dataset.csv
-
-docker compose up
-# Opens at http://localhost:3000
 ```
 
-Everything starts in the correct order:
-1. PostgreSQL waits until healthy
-2. Pipeline applies schema and loads all 4.2M rows (progress visible in logs)
-3. FastAPI starts when pipeline completes
-4. Next.js starts when API is healthy
+Open the `.env` file in any text editor and replace `sk-...` with your real key:
 
-Watch the pipeline load in real time:
+```
+OPENAI_API_KEY=sk-your-actual-key-here
+```
+
+Everything else in `.env` can stay as-is.
+
+### Step 3 — Add the dataset
+
+Download **MoMTSim_20240722202413_1000_dataset.csv** from Kaggle and place it here:
+
+```
+data-engineering-assesment/
+  └── data/
+        └── MoMTSim_20240722202413_1000_dataset.csv   ← place it here
+```
+
+If the `data/` folder does not exist, create it:
+
 ```bash
-docker compose logs pipeline -f
+mkdir data
 ```
 
-### Option B — Local development
+Then move your downloaded file into it.
+
+### Step 4 — Start everything
 
 ```bash
-# 1. Python environment
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# 2. Environment variables
-cp .env.example .env
-# Edit .env: set OPENAI_API_KEY and confirm POSTGRES_PORT=5433
-
-# 3. Start PostgreSQL
-docker compose up postgres -d
-
-# 4. Apply schema + run pipeline
-python sql/apply_schema.py
-python run_pipeline.py          # ~2 minutes for 4.2M rows
-python run_pipeline.py --validate  # dry-run first chunk only
-
-# 5. Start FastAPI backend (terminal 1)
-uvicorn api.main:app --host 0.0.0.0 --port 8000
-
-# 6. Start Next.js frontend (terminal 2)
-cd frontend && npm install && npm run dev
-
-# Open http://localhost:3000
+docker compose up --build
 ```
+
+This single command:
+1. Starts PostgreSQL and waits until it is healthy
+2. Applies the database schema (creates tables and indexes)
+3. Loads all 4,225,958 rows into PostgreSQL — watch the progress in the terminal
+4. Starts the FastAPI backend (the AI question-answering engine)
+5. Starts the Next.js chat interface
+
+**The first run takes about 3–5 minutes** while Docker builds images and the pipeline loads the data.
+Subsequent runs (without `--build`) start in under 30 seconds because the data is already loaded.
+
+You will see output like this in the terminal:
+
+```
+selcom-pipeline  | [1/3] Applying database schema to PostgreSQL...
+selcom-pipeline  |       ✓ Tables ready
+selcom-pipeline  | [2/3] Loading data — 4,225,958 rows across 43 chunks
+selcom-pipeline  |   chunk  1/43  2.3%  │  loaded:   100,000  │  46,201 rows/s
+selcom-pipeline  |   chunk  2/43  4.7%  │  loaded:   200,000  │  47,885 rows/s
+selcom-pipeline  |   ...
+selcom-pipeline  | [3/3] Computing transaction_summary table...
+selcom-pipeline  |       ✓ 45 summary rows computed
+selcom-api       | INFO:     Uvicorn running on http://0.0.0.0:8000
+selcom-frontend  |   ✓ Ready in 2.1s
+```
+
+### Step 5 — Open the chat
+
+Open your browser and go to:
+
+```
+http://localhost:3000
+```
+
+Start asking questions about the data.
 
 ---
 
-## Project Structure
+## What to Ask Sele
 
-```
-├── engine/
-│   ├── loader.py          Chunked CSV reader (100k rows/chunk)
-│   ├── cleaner.py         Null fills, drop rules, type casts, dedup
-│   ├── transformer.py     7 derived columns
-│   ├── loader_db.py       PostgreSQL COPY bulk insert
-│   ├── aggregator.py      INSERT…SELECT → transaction_summary
-│   └── logger.py          Shared logging config
-│
-├── rag/
-│   ├── schema.py          Schema context + few-shot examples for LLM
-│   ├── query_gen.py       NL question → SQL (structured JSON output)
-│   ├── executor.py        sqlparse validation + read-only transaction
-│   ├── hallucination.py   Back-translation check + confidence scoring
-│   └── response_gen.py    Query results → grounded natural language answer
-│
-├── api/
-│   └── main.py            FastAPI app (POST /api/chat, GET /health)
-│
-├── frontend/
-│   ├── app/
-│   │   ├── page.tsx       Sele the Analyst chat UI
-│   │   ├── layout.tsx     Root layout + metadata
-│   │   ├── globals.css    Selcom brand colours (red #E2001A / black / white)
-│   │   └── api/chat/
-│   │       └── route.ts   Next.js route → FastAPI proxy
-│   ├── components/
-│   │   └── SelcomLogo.tsx Selcom speech-bubble SVG wordmark
-│   └── Dockerfile         Node.js multi-stage build
-│
-├── sql/
-│   ├── schema.sql         DDL for both tables and all indexes
-│   └── apply_schema.py    Idempotent schema runner
-│
-├── docs/
-│   ├── design/            Architecture, schema, RAG design docs
-│   └── implementation/    Phase plans and task backlog
-│
-├── run_pipeline.py        Pipeline entry point (with tqdm progress bar)
-├── Dockerfile             Python backend image
-├── docker-compose.yml     Full-stack orchestration
-├── requirements.txt       Python dependencies
-└── .env.example           Environment variable template
-```
-
----
-
-## Pipeline Design Decisions
-
-### Chunked processing
-The source CSV has 4,225,958 rows (~500 MB). Loading it all into RAM would require 2–3 GB for pandas operations. `chunksize=100_000` keeps memory under 200 MB regardless of dataset size — the same code handles 1M or 100M rows.
-
-### PostgreSQL COPY vs INSERT
-`COPY FROM STDIN` bypasses the SQL parser per-row: ~80,000 rows/second. `executemany INSERT` calls the parser per row: ~1,000 rows/second. For 4.2M rows that is the difference between 2 minutes and over an hour.
-
-### 7 derived columns
-
-| Column | Formula | Analytical value |
-|---|---|---|
-| `transaction_hour` | `step % 24` | Detect fraud peaks by hour |
-| `transaction_day` | `(step // 24) + 1` | Trend analysis over simulation days |
-| `amount_bucket` | SMALL / MEDIUM / LARGE / VERY_LARGE | Group amounts into comparable bands |
-| `balance_discrepancy` | `abs((old_bal - amount) - new_bal)` | Ledger integrity check |
-| `has_balance_error` | `discrepancy > 0.01` | Flag suspicious rows |
-| `is_merchant_recipient` | `recipient LIKE '%-%'` | P2P vs merchant payments |
-| `net_recipient_gain` | `new_bal_recipient - old_bal_recipient` | Actual credit vs reported amount |
-
-### Pre-aggregation table
-`transaction_summary` holds one row per `(transaction_day, transaction_type)` — 45 rows total. Queries like "fraud rate by type over time" scan 45 rows instead of 4.2M. Computed once after full load via `INSERT … ON CONFLICT DO UPDATE`.
-
----
-
-## RAG Design Decisions
-
-### Text-to-SQL, not vector RAG
-The data is structured and tabular. Vector similarity retrieval is designed for unstructured text documents. For financial records in a relational database, the correct pattern is: question → SQL → execute → ground the answer in real results. The LLM cannot hallucinate a number because it reads from actual database rows.
-
-### Hallucination detection
-Every answer goes through three layers:
-1. **SQL syntax validation** — sqlparse checks the statement before any DB round-trip
-2. **Read-only transaction** — `BEGIN READ ONLY … ROLLBACK` prevents any write even if guardrails fail
-3. **Back-translation check** — the generated SQL is sent back to the LLM: "what question does this answer?" The alignment between that and the original question is scored 0–1 and averaged with the LLM's self-confidence to produce the final confidence score shown in the UI
-
-### Confidence scoring
-```
-final_confidence = (llm_self_confidence + back_translation_alignment) / 2
-```
-- GREEN  ≥ 80% — HIGH
-- YELLOW ≥ 55% — MEDIUM
-- RED    < 55% — LOW (review the SQL)
-
-### Security guardrails (three layers)
-1. Input validation in the UI (pre-LLM, zero API cost)
-2. System prompt forbids non-SELECT and marks unrelated questions `NOT_ANSWERABLE`
-3. Python regex blocks `INSERT|UPDATE|DELETE|DROP|TRUNCATE|ALTER|CREATE` before execution
-4. DB read-only transaction as final safety net
-
----
-
-## Sample Questions
+Copy and paste any of these to get started:
 
 ```
 Give me an overview of this data
@@ -244,39 +149,187 @@ Compare total deposits vs total withdrawals
 Which day had the highest number of fraudulent transactions?
 What is the largest single fraudulent transaction?
 Show balance errors by transaction type
-What is the net money flow per simulation day?
-Show breakdown of transactions by amount bucket
 How many unique merchant accounts received payments?
+What is the net money flow per simulation day?
+```
+
+You can also ask follow-up questions after any answer:
+- "What do you mean by hour 0?"
+- "Is that fraud rate normal?"
+- "Explain that result"
+
+---
+
+## Watching the Pipeline Load (Optional)
+
+To see only the data loading progress in a separate terminal:
+
+```bash
+docker compose logs pipeline -f
+```
+
+To see the API handling requests:
+
+```bash
+docker compose logs api -f
+```
+
+To stop everything:
+
+```bash
+docker compose down
 ```
 
 ---
 
-## Data Quality
+## Troubleshooting
 
-| Metric | Value |
+| Problem | Fix |
 |---|---|
-| Source rows | 4,225,958 |
-| Rows loaded | 4,225,882 |
-| Rows dropped | 76 (null required fields or amount ≤ 0) |
-| Transaction types | PAYMENT, TRANSFER, DEPOSIT, WITHDRAWAL, DEBIT |
-| Fraud transactions | 2,233,060 (52.84% — all in TRANSFER type) |
-| Balance errors | 1,311,444 |
-| Simulation days | 9 |
-| Summary rows | 45 (9 days × 5 types) |
+| `docker compose` command not found | Make sure Docker Desktop is running (open the app) |
+| Port 3000 already in use | Stop whatever is using port 3000, or change `"3000:3000"` to `"3001:3000"` in `docker-compose.yml` |
+| Port 5433 already in use | Change `"5433:5432"` to `"5434:5432"` in `docker-compose.yml` and update `POSTGRES_PORT=5434` in `.env` |
+| `chatbot-ui` never starts | The pipeline must finish first. Wait for the `PIPELINE COMPLETE` message. |
+| `selcom-api` unhealthy | Wait 30–60 seconds after the pipeline finishes — the API needs time to start |
+| CSV file not found | Make sure the file is inside the `data/` folder with the exact filename from Kaggle |
+| OpenAI error | Double-check your API key in `.env` — make sure there are no spaces or quotes around it |
+| Answer says "I can only answer questions about..." | The question is out of scope. Try one of the sample questions above. |
+
+---
+
+## How It Works
+
+```
+You type a question
+        │
+        ▼
+[LangGraph] classifies: data question or follow-up?
+        │
+        ├─ Follow-up ──► AI explains in plain English
+        │
+        └─ Data question
+                │
+                ▼
+        [GPT-4o-mini] writes a PostgreSQL SQL query
+                │
+                ▼
+        [Validator] checks the SQL is safe (SELECT only, read-only transaction)
+                │
+                ▼
+        [PostgreSQL] executes against 4.2M rows
+                │
+                ▼
+        [Hallucination check] re-reads the SQL: "Does this actually answer the question?"
+                │
+                ▼
+        [GPT-4o-mini] writes a grounded answer using only the real results
+                │
+                ▼
+        You see the answer + confidence score + SQL + data preview
+```
+
+---
+
+## Architecture
+
+```
+docker compose up
+       │
+       ├── selcom-postgres    PostgreSQL 15 — stores all transaction data (port 5433)
+       │
+       ├── selcom-pipeline    Python — loads 4.2M rows, builds summary table (exits after)
+       │
+       ├── selcom-api         FastAPI — receives questions, runs the AI pipeline (port 8000)
+       │
+       └── chatbot-ui         Next.js — the chat interface you see in your browser (port 3000)
+```
+
+Services start in this exact order. Each waits for the previous to be healthy before starting.
+
+---
+
+## All Dependencies
+
+All dependencies are managed by Docker — you do not need to install Python packages or Node modules manually.
+
+**Python (backend):**
+
+| Package | Version | Purpose |
+|---|---|---|
+| pandas | >=2.0.0 | Chunked CSV reading and transformation |
+| psycopg2-binary | >=2.9.0 | PostgreSQL connection and COPY bulk insert |
+| openai | >=1.0.0 | GPT-4o-mini API for SQL generation and responses |
+| langgraph | >=0.2.0 | Conversation state management and graph routing |
+| langchain-core | >=0.3.0 | Message types for LangGraph memory |
+| fastapi | >=0.110.0 | REST API server |
+| uvicorn | >=0.29.0 | ASGI server for FastAPI |
+| sqlparse | >=0.4.4 | SQL syntax validation |
+| python-dotenv | >=1.0.0 | Environment variable loading |
+| tqdm | >=4.65.0 | Progress bar during pipeline load |
+
+**Frontend:**
+
+| Package | Purpose |
+|---|---|
+| Next.js 15 | React framework for the chat UI |
+| React 19 | UI components |
+| Tailwind CSS | Styling |
+| react-markdown | Renders markdown in chat responses |
 
 ---
 
 ## Environment Variables
 
-| Variable | Description | Default |
+All configured in `.env`. Only `OPENAI_API_KEY` is required — everything else has defaults.
+
+| Variable | Default | Description |
 |---|---|---|
-| `POSTGRES_HOST` | PostgreSQL host | `127.0.0.1` |
-| `POSTGRES_PORT` | Host port for PostgreSQL | `5433` |
-| `POSTGRES_DB` | Database name | `selcom_assessment` |
-| `POSTGRES_USER` | Database user | `selcom` |
-| `POSTGRES_PASSWORD` | Database password | `selcom_pass` |
-| `OPENAI_API_KEY` | OpenAI API key | *(required)* |
+| `OPENAI_API_KEY` | *(required)* | Your OpenAI API key |
+| `POSTGRES_HOST` | `127.0.0.1` | Database host |
+| `POSTGRES_PORT` | `5433` | Host port for PostgreSQL |
+| `POSTGRES_DB` | `selcom_assessment` | Database name |
+| `POSTGRES_USER` | `selcom` | Database user |
+| `POSTGRES_PASSWORD` | `selcom_pass` | Database password |
 
 ---
 
-*Built for the Selcom Paytech Data Engineer pre-interview assessment. Deadline: 2026-07-17.*
+## Project Structure
+
+```
+├── engine/              Python data pipeline modules
+│   ├── loader.py        Chunked CSV reader (100k rows/chunk)
+│   ├── cleaner.py       Cleaning and validation rules
+│   ├── transformer.py   7 derived analytical columns
+│   ├── loader_db.py     PostgreSQL COPY bulk insert
+│   └── aggregator.py    Builds the transaction_summary table
+│
+├── rag/                 AI question-answering pipeline
+│   ├── graph.py         LangGraph graph (classify → SQL → execute → validate → answer)
+│   ├── state.py         Typed state with conversation memory
+│   ├── schema.py        Database schema context + few-shot SQL examples
+│   ├── query_gen.py     Natural language → SQL (GPT-4o-mini)
+│   ├── executor.py      SQL safety check + read-only execution
+│   ├── hallucination.py Back-translation confidence scoring
+│   └── response_gen.py  SQL results → grounded natural language answer
+│
+├── api/
+│   └── main.py          FastAPI server (POST /api/chat, GET /health)
+│
+├── frontend/            Next.js chat interface (Sele the Analyst)
+│
+├── sql/
+│   ├── schema.sql       Database table definitions and indexes
+│   └── apply_schema.py  Applies schema to PostgreSQL (idempotent)
+│
+├── data/                Place your CSV here (git-ignored — too large)
+├── run_pipeline.py      Pipeline entry point with progress display
+├── Dockerfile           Python backend Docker image
+├── docker-compose.yml   Full-stack orchestration (4 services)
+├── requirements.txt     Python dependencies
+├── .env.example         Environment variable template
+└── REPORT.md            Technical approach and design decisions
+```
+
+---
+
+*Built for the Selcom Paytech Data Engineer pre-interview assessment — July 2026.*
