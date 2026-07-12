@@ -15,7 +15,11 @@ from __future__ import annotations
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from openai import OpenAI
+from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+
+from engine.logger import get_logger
+
+_log = get_logger("rag.graph")
 
 from rag.executor import execute_query
 from rag.hallucination import validate as validate_hallucination
@@ -53,28 +57,32 @@ def build_graph(client: OpenAI, pool):
         if not history:
             return {"question_type": "data_query"}
 
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0,
-            max_tokens=10,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Conversation so far:\n{_history_text(history)}\n\n"
-                    f'New message: "{state["question"]}"\n\n'
-                    "Is this:\n"
-                    'A) A follow-up or clarification about the conversation above '
-                    '(e.g. "what does that mean?", "explain hour 0", "why is that?", '
-                    '"is that normal?", "what is TRANSFER?")\n'
-                    'B) A new data question about the mobile money dataset\n\n'
-                    'Reply with only one word: "clarification" or "data_query"'
-                ),
-            }],
-        )
-        label = resp.choices[0].message.content.strip().lower().strip('"')
-        if label not in ("clarification", "data_query"):
-            label = "data_query"
-        return {"question_type": label}
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0,
+                max_tokens=10,
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Conversation so far:\n{_history_text(history)}\n\n"
+                        f'New message: "{state["question"]}"\n\n'
+                        "Is this:\n"
+                        'A) A follow-up or clarification about the conversation above '
+                        '(e.g. "what does that mean?", "explain hour 0", "why is that?", '
+                        '"is that normal?", "what is TRANSFER?")\n'
+                        'B) A new data question about the mobile money dataset\n\n'
+                        'Reply with only one word: "clarification" or "data_query"'
+                    ),
+                }],
+            )
+            label = resp.choices[0].message.content.strip().lower().strip('"')
+            if label not in ("clarification", "data_query"):
+                label = "data_query"
+            return {"question_type": label}
+        except (APIError, APITimeoutError, RateLimitError) as exc:
+            _log.warning("classify: OpenAI error — defaulting to data_query: %s", exc)
+            return {"question_type": "data_query"}  # safe fallback
 
     def gen_sql(state: RAGState) -> dict:
         """Generate SQL, optionally enriched with conversation context."""
@@ -93,6 +101,9 @@ def build_graph(client: OpenAI, pool):
             }
         except (NotAnswerableError, ValueError) as e:
             return {"question_type": "not_answerable", "error": str(e)}
+        except (APIError, APITimeoutError, RateLimitError) as e:
+            _log.error("gen_sql: OpenAI error: %s", e)
+            return {"question_type": "not_answerable", "error": "AI service is temporarily unavailable. Please try again in a moment."}
 
     def execute(state: RAGState) -> dict:
         """Execute SQL against PostgreSQL using a pooled connection."""
@@ -134,30 +145,34 @@ def build_graph(client: OpenAI, pool):
         history = state.get("messages", [])
         ctx = _history_text(history, n=4) if history else "(no prior context)"
 
-        resp = client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.4,
-            max_tokens=300,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Sele the Analyst, an AI data assistant for Selcom Paytech's mobile money data. "
-                        "You are answering a follow-up or clarification about a previous response. "
-                        "Be clear, friendly, and concise — explain data concepts in plain language. "
-                        "Examples: 'hour 0' means midnight 00:00–00:59; "
-                        "'TRANSFER' is a peer-to-peer money transfer transaction type; "
-                        "'balance discrepancy' means the ledger doesn't add up correctly. "
-                        "Keep your answer to 2–4 sentences."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"Conversation:\n{ctx}\n\nFollow-up question: {state['question']}",
-                },
-            ],
-        )
-        answer = resp.choices[0].message.content.strip()
+        try:
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0.4,
+                max_tokens=300,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are Sele the Analyst, an AI data assistant for Selcom Paytech's mobile money data. "
+                            "You are answering a follow-up or clarification about a previous response. "
+                            "Be clear, friendly, and concise — explain data concepts in plain language. "
+                            "Examples: 'hour 0' means midnight 00:00–00:59; "
+                            "'TRANSFER' is a peer-to-peer money transfer transaction type; "
+                            "'balance discrepancy' means the ledger doesn't add up correctly. "
+                            "Keep your answer to 2–4 sentences."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Conversation:\n{ctx}\n\nFollow-up question: {state['question']}",
+                    },
+                ],
+            )
+            answer = resp.choices[0].message.content.strip()
+        except (APIError, APITimeoutError, RateLimitError) as exc:
+            _log.error("clarify: OpenAI error: %s", exc)
+            answer = "I'm having trouble reaching the AI service right now. Please try again in a moment."
         return {
             "answer": answer,
             "question_type": "clarification",

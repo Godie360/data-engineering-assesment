@@ -78,7 +78,8 @@ def validate(
         )
         data = json.loads(response.choices[0].message.content)
         back_question = data.get("back_question", "")
-        alignment_score = float(data.get("alignment", 0.5))
+        raw_alignment = float(data.get("alignment", 0.5))
+        alignment_score = max(0.0, min(1.0, raw_alignment))  # clamp untrusted model output
     except Exception as exc:
         logger.warning("Back-translation check failed: %s", exc)
         back_question = ""

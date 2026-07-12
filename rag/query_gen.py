@@ -88,8 +88,12 @@ def generate_sql(question: str, schema_context: str, client: OpenAI) -> Generate
     if _FORBIDDEN.search(sql):
         raise ValueError(f"Unsafe SQL generated: {sql[:120]}")
 
+    # Clamp to valid range — model output is untrusted at this boundary
+    raw_confidence = float(data.get("confidence", 0.5))
+    llm_confidence = max(0.0, min(1.0, raw_confidence))
+
     return GeneratedQuery(
         sql=sql,
         explanation=data.get("explanation", ""),
-        llm_confidence=float(data.get("confidence", 0.5)),
+        llm_confidence=llm_confidence,
     )
