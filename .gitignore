@@ -23,8 +23,14 @@ frontend/node_modules/
 frontend/out/
 
 # Agent / IDE internals
+.agents/
 .claude/
 .junie/
+AGENTS.md
+CLAUDE.md
+
+# Personal prep notes (local only)
+PRESENTATION_PREP.md
 
 # OS
 .DS_Store
